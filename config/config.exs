@@ -7,6 +7,19 @@
 # General application configuration
 import Config
 
+config :ai_guard, :scopes,
+  user: [
+    default: true,
+    module: AiGuard.Accounts.Scope,
+    assign_key: :current_scope,
+    access_path: [:user, :id],
+    schema_key: :user_id,
+    schema_type: :id,
+    schema_table: :users,
+    test_data_fixture: AiGuard.AccountsFixtures,
+    test_setup_helper: :register_and_log_in_user
+  ]
+
 config :ai_guard,
   ecto_repos: [AiGuard.Repo],
   generators: [timestamp_type: :utc_datetime]

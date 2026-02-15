@@ -3,10 +3,9 @@ import Config
 # Configure your database
 config :ai_guard, AiGuard.Repo,
   username: "postgres",
-  password: "postgres",
+  password: "rk21postgres",
   hostname: "localhost",
   database: "ai_guard_dev",
-  stacktrace: true,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 
