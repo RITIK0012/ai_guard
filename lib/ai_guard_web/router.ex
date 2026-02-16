@@ -23,6 +23,10 @@ defmodule AiGuardWeb.Router do
     get "/", PageController, :home
   end
 
+  scope "/api", AiGuardWeb do
+    pipe_through :api
+    post "/moderate", ModerationController, :create
+  end
   # Other scopes may use custom stacks.
   # scope "/api", AiGuardWeb do
   #   pipe_through :api
