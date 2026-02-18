@@ -88,4 +88,90 @@ defmodule AiGuard.BillingTest do
       assert %Ecto.Changeset{} = Billing.change_api_key(scope, api_key)
     end
   end
+
+  describe "usages" do
+    alias AiGuard.Billing.Usage
+
+    import AiGuard.AccountsFixtures, only: [user_scope_fixture: 0]
+    import AiGuard.BillingFixtures
+
+    @invalid_attrs %{"\\": nil}
+
+    test "list_usages/1 returns all scoped usages" do
+      scope = user_scope_fixture()
+      other_scope = user_scope_fixture()
+      usage = usage_fixture(scope)
+      other_usage = usage_fixture(other_scope)
+      assert Billing.list_usages(scope) == [usage]
+      assert Billing.list_usages(other_scope) == [other_usage]
+    end
+
+    test "get_usage!/2 returns the usage with given id" do
+      scope = user_scope_fixture()
+      usage = usage_fixture(scope)
+      other_scope = user_scope_fixture()
+      assert Billing.get_usage!(scope, usage.id) == usage
+      assert_raise Ecto.NoResultsError, fn -> Billing.get_usage!(other_scope, usage.id) end
+    end
+
+    test "create_usage/2 with valid data creates a usage" do
+      valid_attrs = %{"\\": "some \\"}
+      scope = user_scope_fixture()
+
+      assert {:ok, %Usage{} = usage} = Billing.create_usage(scope, valid_attrs)
+      assert usage.\ == "some \\"
+      assert usage.user_id == scope.user.id
+    end
+
+    test "create_usage/2 with invalid data returns error changeset" do
+      scope = user_scope_fixture()
+      assert {:error, %Ecto.Changeset{}} = Billing.create_usage(scope, @invalid_attrs)
+    end
+
+    test "update_usage/3 with valid data updates the usage" do
+      scope = user_scope_fixture()
+      usage = usage_fixture(scope)
+      update_attrs = %{"\\": "some updated \\"}
+
+      assert {:ok, %Usage{} = usage} = Billing.update_usage(scope, usage, update_attrs)
+      assert usage.\ == "some updated \\"
+    end
+
+    test "update_usage/3 with invalid scope raises" do
+      scope = user_scope_fixture()
+      other_scope = user_scope_fixture()
+      usage = usage_fixture(scope)
+
+      assert_raise MatchError, fn ->
+        Billing.update_usage(other_scope, usage, %{})
+      end
+    end
+
+    test "update_usage/3 with invalid data returns error changeset" do
+      scope = user_scope_fixture()
+      usage = usage_fixture(scope)
+      assert {:error, %Ecto.Changeset{}} = Billing.update_usage(scope, usage, @invalid_attrs)
+      assert usage == Billing.get_usage!(scope, usage.id)
+    end
+
+    test "delete_usage/2 deletes the usage" do
+      scope = user_scope_fixture()
+      usage = usage_fixture(scope)
+      assert {:ok, %Usage{}} = Billing.delete_usage(scope, usage)
+      assert_raise Ecto.NoResultsError, fn -> Billing.get_usage!(scope, usage.id) end
+    end
+
+    test "delete_usage/2 with invalid scope raises" do
+      scope = user_scope_fixture()
+      other_scope = user_scope_fixture()
+      usage = usage_fixture(scope)
+      assert_raise MatchError, fn -> Billing.delete_usage(other_scope, usage) end
+    end
+
+    test "change_usage/2 returns a usage changeset" do
+      scope = user_scope_fixture()
+      usage = usage_fixture(scope)
+      assert %Ecto.Changeset{} = Billing.change_usage(scope, usage)
+    end
+  end
 end

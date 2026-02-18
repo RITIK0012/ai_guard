@@ -63,6 +63,7 @@ defmodule AiGuardWeb.Router do
     live "/dashboards/new", PageLive.Form, :new
     live "/dashboards/:id", PageLive.Show, :show
     live "/dashboards/:id/edit", PageLive.Form, :edit
+    live "/usage", UsageLive
     end
 
     post "/users/update-password", UserSessionController, :update_password

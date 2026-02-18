@@ -1,18 +1,16 @@
 defmodule AiGuard.BillingFixtures do
   @moduledoc """
-  This module defines test helpers for creating
-  entities via the `AiGuard.Billing` context.
+  Test helpers for Billing context.
   """
 
-  @doc """
-  Generate a api_key.
-  """
+  alias AiGuard.Billing
+
   def api_key_fixture(scope, attrs \\ %{}) do
-  attrs =
-    Enum.into(attrs, %{})
+    {:ok, api_key} = Billing.create_api_key(scope, attrs)
+    api_key
+  end
 
-  {:ok, api_key} = AiGuard.Billing.create_api_key(attrs, scope)
-  api_key
-end
-
+  def usage_fixture(api_key_id) do
+    Billing.increment_usage(api_key_id)
+  end
 end

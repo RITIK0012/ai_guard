@@ -144,4 +144,31 @@ defmodule AiGuard.Billing do
 
     ApiKey.changeset(api_key, attrs, scope)
   end
+
+  alias AiGuard.Billing.Usage
+
+# Increment usage for an API key
+def increment_usage(api_key_id) do
+  case Repo.get_by(Usage, api_key_id: api_key_id) do
+    nil ->
+      %Usage{}
+      |> Usage.changeset(%{api_key_id: api_key_id, count: 1})
+      |> Repo.insert()
+
+    usage ->
+      usage
+      |> Usage.changeset(%{count: usage.count + 1})
+      |> Repo.update()
+  end
+end
+
+# Get usage count for an API key
+def get_usage_for_key(api_key_id) do
+  case Repo.get_by(Usage, api_key_id: api_key_id) do
+    nil -> 0
+    usage -> usage.count
+  end
+end
+
+
 end

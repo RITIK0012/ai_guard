@@ -5,7 +5,7 @@ defmodule AiGuardWeb.ModerationController do
   alias AiGuard.Billing.ApiKey
   alias AiGuard.Api
   import Ecto.Query
-
+  alias AiGuard.Billing
   # POST /api/moderate
   def create(conn, %{"text" => text}) do
     with ["Bearer " <> key] <- get_req_header(conn, "authorization"),
@@ -24,7 +24,7 @@ defmodule AiGuardWeb.ModerationController do
           api_key: api_key.key,
           user_id: api_key.user_id
         })
-
+      Billing.increment_usage(api_key.id)
       json(conn, %{result: result})
     else
       _ ->
