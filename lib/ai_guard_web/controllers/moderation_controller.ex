@@ -4,12 +4,17 @@ defmodule AiGuardWeb.ModerationController do
   alias AiGuard.Repo
   alias AiGuard.Billing.ApiKey
   alias AiGuard.Api
-  import Ecto.Query
   alias AiGuard.Billing
+  import Ecto.Query
+
+  # 🚦 Max requests per minute per API key
+  @rate_limit 5
+
   # POST /api/moderate
   def create(conn, %{"text" => text}) do
     with ["Bearer " <> key] <- get_req_header(conn, "authorization"),
-         {:ok, api_key} <- validate_api_key(key) do
+         {:ok, api_key} <- validate_api_key(key),
+         false <- Billing.rate_limited?(api_key.id, @rate_limit) do
 
       result = moderate_text(text)
 
@@ -24,9 +29,18 @@ defmodule AiGuardWeb.ModerationController do
           api_key: api_key.key,
           user_id: api_key.user_id
         })
+
+      # increment usage counter
       Billing.increment_usage(api_key.id)
+
       json(conn, %{result: result})
+
     else
+      true ->
+        conn
+        |> put_status(429)
+        |> json(%{error: "Rate limit exceeded. Try again in a minute."})
+
       _ ->
         conn
         |> put_status(:unauthorized)

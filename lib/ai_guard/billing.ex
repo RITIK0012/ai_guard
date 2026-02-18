@@ -135,5 +135,21 @@ defmodule AiGuard.Billing do
   )
   |> Repo.update()
 end
-
+# Rate limit: max requests per minute
+def rate_limited?(api_key_id, limit \\ 5) do
+  one_minute_ago =
+    DateTime.utc_now()
+    |> DateTime.add(-60, :second)
+  count =
+    Repo.aggregate(
+      from(m in "moderations",
+      where: m.api_key == ^get_key_string(api_key_id) and m.inserted_at > ^one_minute_ago
+      ),
+      :count
+    )
+    count >= limit
+end
+defp get_key_string(api_key_id) do
+  Repo.get!(ApiKey, api_key_id).key
+end
 end
