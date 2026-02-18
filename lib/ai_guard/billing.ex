@@ -17,28 +17,19 @@ defmodule AiGuard.Billing do
     * {:created, %ApiKey{}}
     * {:updated, %ApiKey{}}
     * {:deleted, %ApiKey{}}
-
   """
   def subscribe_api_keys(%Scope{} = scope) do
     key = scope.user.id
-
     Phoenix.PubSub.subscribe(AiGuard.PubSub, "user:#{key}:api_keys")
   end
 
   defp broadcast_api_key(%Scope{} = scope, message) do
     key = scope.user.id
-
     Phoenix.PubSub.broadcast(AiGuard.PubSub, "user:#{key}:api_keys", message)
   end
 
   @doc """
   Returns the list of api_keys.
-
-  ## Examples
-
-      iex> list_api_keys(scope)
-      [%ApiKey{}, ...]
-
   """
   def list_api_keys(%Scope{} = scope) do
     Repo.all_by(ApiKey, user_id: scope.user.id)
@@ -46,33 +37,13 @@ defmodule AiGuard.Billing do
 
   @doc """
   Gets a single api_key.
-
-  Raises `Ecto.NoResultsError` if the Api key does not exist.
-
-  ## Examples
-
-      iex> get_api_key!(scope, 123)
-      %ApiKey{}
-
-      iex> get_api_key!(scope, 456)
-      ** (Ecto.NoResultsError)
-
   """
   def get_api_key!(%Scope{} = scope, id) do
     Repo.get_by!(ApiKey, id: id, user_id: scope.user.id)
   end
 
   @doc """
-  Creates a api_key.
-
-  ## Examples
-
-      iex> create_api_key(scope, %{field: value})
-      {:ok, %ApiKey{}}
-
-      iex> create_api_key(scope, %{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
+  Creates an api_key.
   """
   def create_api_key(%Scope{} = scope, attrs) do
     with {:ok, api_key = %ApiKey{}} <-
@@ -85,16 +56,7 @@ defmodule AiGuard.Billing do
   end
 
   @doc """
-  Updates a api_key.
-
-  ## Examples
-
-      iex> update_api_key(scope, api_key, %{field: new_value})
-      {:ok, %ApiKey{}}
-
-      iex> update_api_key(scope, api_key, %{field: bad_value})
-      {:error, %Ecto.Changeset{}}
-
+  Updates an api_key.
   """
   def update_api_key(%Scope{} = scope, %ApiKey{} = api_key, attrs) do
     true = api_key.user_id == scope.user.id
@@ -109,22 +71,12 @@ defmodule AiGuard.Billing do
   end
 
   @doc """
-  Deletes a api_key.
-
-  ## Examples
-
-      iex> delete_api_key(scope, api_key)
-      {:ok, %ApiKey{}}
-
-      iex> delete_api_key(scope, api_key)
-      {:error, %Ecto.Changeset{}}
-
+  Deletes an api_key.
   """
   def delete_api_key(%Scope{} = scope, %ApiKey{} = api_key) do
     true = api_key.user_id == scope.user.id
 
-    with {:ok, api_key = %ApiKey{}} <-
-           Repo.delete(api_key) do
+    with {:ok, api_key = %ApiKey{}} <- Repo.delete(api_key) do
       broadcast_api_key(scope, {:deleted, api_key})
       {:ok, api_key}
     end
@@ -132,43 +84,56 @@ defmodule AiGuard.Billing do
 
   @doc """
   Returns an `%Ecto.Changeset{}` for tracking api_key changes.
-
-  ## Examples
-
-      iex> change_api_key(scope, api_key)
-      %Ecto.Changeset{data: %ApiKey{}}
-
   """
   def change_api_key(%Scope{} = scope, %ApiKey{} = api_key, attrs \\ %{}) do
     true = api_key.user_id == scope.user.id
-
     ApiKey.changeset(api_key, attrs, scope)
   end
 
+  # =========================
+  # USAGE TRACKING
+  # =========================
+
   alias AiGuard.Billing.Usage
 
-# Increment usage for an API key
-def increment_usage(api_key_id) do
-  case Repo.get_by(Usage, api_key_id: api_key_id) do
-    nil ->
-      %Usage{}
-      |> Usage.changeset(%{api_key_id: api_key_id, count: 1})
-      |> Repo.insert()
+  # Increment usage for an API key
+  def increment_usage(api_key_id) do
+    case Repo.get_by(Usage, api_key_id: api_key_id) do
+      nil ->
+        %Usage{}
+        |> Usage.changeset(%{api_key_id: api_key_id, count: 1})
+        |> Repo.insert()
 
-    usage ->
-      usage
-      |> Usage.changeset(%{count: usage.count + 1})
-      |> Repo.update()
+      usage ->
+        usage
+        |> Usage.changeset(%{count: usage.count + 1})
+        |> Repo.update()
+    end
   end
-end
 
-# Get usage count for an API key
-def get_usage_for_key(api_key_id) do
-  case Repo.get_by(Usage, api_key_id: api_key_id) do
-    nil -> 0
-    usage -> usage.count
+  # Get usage count for an API key
+  def get_usage_for_key(api_key_id) do
+    case Repo.get_by(Usage, api_key_id: api_key_id) do
+      nil -> 0
+      usage -> usage.count
+    end
   end
-end
 
+  # =========================
+  # REVOKE API KEY
+  # =========================
+
+  @doc """
+  Revokes an API key by setting revoked_at timestamp.
+  """
+  def revoke_api_key(id) do
+  key = Repo.get!(ApiKey, id)
+
+  key
+  |> Ecto.Changeset.change(
+    revoked_at: DateTime.utc_now() |> DateTime.truncate(:second)
+  )
+  |> Repo.update()
+end
 
 end
