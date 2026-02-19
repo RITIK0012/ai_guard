@@ -1,44 +1,72 @@
-<div class="max-w-5xl mx-auto py-10 px-4">
-  <!-- Header -->
-  <div class="mb-8">
-    <h1 class="text-3xl font-bold text-white">API Usage Dashboard</h1>
-    <p class="text-gray-400 mt-1">Monitor API calls for each key</p>
+<div class="max-w-6xl mx-auto py-10 px-6">
+
+  <!-- 🔹 Header -->
+  <div class="mb-10">
+    <h1 class="text-4xl font-bold text-white tracking-tight">
+      API Usage Dashboard
+    </h1>
+    <p class="text-gray-400 mt-2">
+      Monitor and manage API usage across your keys
+    </p>
   </div>
 
-  <!-- Stats Cards -->
-  <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-    <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
-      <p class="text-gray-400 text-sm">Total Keys</p>
-      <p class="text-2xl font-bold text-white"><%= length(@usage_data) %></p>
+  
+  <!-- Usage Chart -->
+<div class="bg-gray-800 border border-gray-700 rounded-2xl p-6 mb-8">
+  <h2 class="text-lg font-semibold text-white mb-4">Usage Analytics</h2>
+
+  <canvas
+    id="usageChart"
+    phx-hook="UsageChart"
+    data-labels={Jason.encode!(Enum.map(@usage_data, & &1.label))}
+    data-values={Jason.encode!(Enum.map(@usage_data, & &1.count))}
+    data-fullkeys={Jason.encode!(Enum.map(@usage_data, & &1.full_key))}
+    class="w-full h-64"
+  ></canvas>
+</div>
+
+
+  <!-- 🔹 Stats Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+    <!-- Total Keys -->
+    <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-sm">
+      <p class="text-gray-400 text-sm">Total API Keys</p>
+      <p class="text-3xl font-bold text-white mt-1">
+        <%= length(@usage_data) %>
+      </p>
     </div>
 
-    <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
+    <!-- Total Calls -->
+    <div class="bg-gray-800 p-6 rounded-2xl border border-gray-700 shadow-sm">
       <p class="text-gray-400 text-sm">Total API Calls</p>
-      <p class="text-2xl font-bold text-white">
+      <p class="text-3xl font-bold text-white mt-1">
         <%= Enum.sum(Enum.map(@usage_data, & &1.count)) %>
       </p>
     </div>
   </div>
 
-  <!-- Usage Cards -->
+  <!-- 🔹 API Key Cards -->
   <div class="grid gap-6">
     <%= for item <- @usage_data do %>
-      <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-md p-6 hover:border-indigo-500 transition">
+      <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-md p-6 hover:border-indigo-500 hover:shadow-xl transition">
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
 
-          <!-- API Key -->
+          <!-- 🔑 API Key -->
           <div class="md:col-span-2">
-            <p class="text-sm text-gray-400">API Key</p>
-            <p class="font-mono text-white break-all">
+            <p class="text-sm text-gray-400 mb-1">API Key</p>
+            <p class="font-mono text-white break-all text-sm leading-relaxed">
               <%= item.key %>
             </p>
           </div>
 
-          <!-- Usage + Revoke -->
-          <div class="flex flex-col md:items-end gap-2">
-            <div>
+          <!-- 📊 Usage + Revoke -->
+          <div class="flex flex-col md:items-end gap-3">
+
+            <!-- Usage Badge -->
+            <div class="text-right">
               <p class="text-sm text-gray-400">Usage</p>
+
               <span class={
                 "inline-block mt-1 px-4 py-2 rounded-full text-sm font-semibold " <>
                 cond do
@@ -56,21 +84,22 @@
             <button
               phx-click="revoke"
               phx-value-id={item.id}
-              class="text-red-400 hover:text-red-600 text-sm font-semibold"
+              class="text-red-400 hover:text-red-600 text-sm font-semibold transition"
             >
-              Revoke
+              Revoke Key
             </button>
-          </div>
 
+          </div>
         </div>
       </div>
     <% end %>
   </div>
 
-  <!-- Empty state -->
+  <!-- 🔹 Empty State -->
   <%= if Enum.empty?(@usage_data) do %>
-    <div class="text-center text-gray-400 mt-12">
-      No API keys yet.
+    <div class="text-center text-gray-400 mt-16">
+      No API keys found.
     </div>
   <% end %>
+
 </div>

@@ -30,7 +30,18 @@ defmodule AiGuardWeb.UsageLive do
     usage_data =
       Enum.map(api_keys, fn key ->
         count = Billing.get_usage_for_key(key.id)
-        %{id: key.id, key: key.key, count: count}
+
+        short =
+          key.key
+          |> String.slice(-4, 4)
+
+        %{
+          id: key.id,
+          key: key.key,
+          label: "Key ••••#{short}",
+          full_key: key.key,
+          count: count
+        }
       end)
 
     assign(socket, usage_data: usage_data)
