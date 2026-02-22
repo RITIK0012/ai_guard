@@ -13,10 +13,12 @@ window.Chart = Chart
 
 // ✅ Usage Chart Hook
 import UsageChart from "./hooks/usage_chart"
+import MonthlyUsageChart from "./hooks/monthly_usage_chart"
 
 // Merge hooks
 let Hooks = { ...colocatedHooks }
 Hooks.UsageChart = UsageChart
+Hooks.MonthlyUsageChart = MonthlyUsageChart
 
 // CSRF
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

@@ -1,102 +1,32 @@
 defmodule AiGuard.Billing do
-  @moduledoc """
-  The Billing context.
-  """
+  @moduledoc "Billing context"
 
   import Ecto.Query, warn: false
   alias AiGuard.Repo
-
-  alias AiGuard.Billing.ApiKey
+  alias AiGuard.Billing.{ApiKey, Usage}
   alias AiGuard.Accounts.Scope
 
-  @doc """
-  Subscribes to scoped notifications about any api_key changes.
+  @free_tier 10
+  @price_per_call 0.005
 
-  The broadcasted messages match the pattern:
+  # ================= API KEYS =================
 
-    * {:created, %ApiKey{}}
-    * {:updated, %ApiKey{}}
-    * {:deleted, %ApiKey{}}
-  """
-  def subscribe_api_keys(%Scope{} = scope) do
-    key = scope.user.id
-    Phoenix.PubSub.subscribe(AiGuard.PubSub, "user:#{key}:api_keys")
-  end
-
-  defp broadcast_api_key(%Scope{} = scope, message) do
-    key = scope.user.id
-    Phoenix.PubSub.broadcast(AiGuard.PubSub, "user:#{key}:api_keys", message)
-  end
-
-  @doc """
-  Returns the list of api_keys.
-  """
   def list_api_keys(%Scope{} = scope) do
     Repo.all_by(ApiKey, user_id: scope.user.id)
   end
 
-  @doc """
-  Gets a single api_key.
-  """
-  def get_api_key!(%Scope{} = scope, id) do
-    Repo.get_by!(ApiKey, id: id, user_id: scope.user.id)
+  def revoke_api_key(id) do
+    key = Repo.get!(ApiKey, id)
+
+    key
+    |> Ecto.Changeset.change(
+      revoked_at: DateTime.utc_now() |> DateTime.truncate(:second)
+    )
+    |> Repo.update()
   end
 
-  @doc """
-  Creates an api_key.
-  """
-  def create_api_key(%Scope{} = scope, attrs) do
-    with {:ok, api_key = %ApiKey{}} <-
-           %ApiKey{}
-           |> ApiKey.changeset(attrs, scope)
-           |> Repo.insert() do
-      broadcast_api_key(scope, {:created, api_key})
-      {:ok, api_key}
-    end
-  end
+  # ================= USAGE =================
 
-  @doc """
-  Updates an api_key.
-  """
-  def update_api_key(%Scope{} = scope, %ApiKey{} = api_key, attrs) do
-    true = api_key.user_id == scope.user.id
-
-    with {:ok, api_key = %ApiKey{}} <-
-           api_key
-           |> ApiKey.changeset(attrs, scope)
-           |> Repo.update() do
-      broadcast_api_key(scope, {:updated, api_key})
-      {:ok, api_key}
-    end
-  end
-
-  @doc """
-  Deletes an api_key.
-  """
-  def delete_api_key(%Scope{} = scope, %ApiKey{} = api_key) do
-    true = api_key.user_id == scope.user.id
-
-    with {:ok, api_key = %ApiKey{}} <- Repo.delete(api_key) do
-      broadcast_api_key(scope, {:deleted, api_key})
-      {:ok, api_key}
-    end
-  end
-
-  @doc """
-  Returns an `%Ecto.Changeset{}` for tracking api_key changes.
-  """
-  def change_api_key(%Scope{} = scope, %ApiKey{} = api_key, attrs \\ %{}) do
-    true = api_key.user_id == scope.user.id
-    ApiKey.changeset(api_key, attrs, scope)
-  end
-
-  # =========================
-  # USAGE TRACKING
-  # =========================
-
-  alias AiGuard.Billing.Usage
-
-  # Increment usage for an API key
   def increment_usage(api_key_id) do
     case Repo.get_by(Usage, api_key_id: api_key_id) do
       nil ->
@@ -111,7 +41,6 @@ defmodule AiGuard.Billing do
     end
   end
 
-  # Get usage count for an API key
   def get_usage_for_key(api_key_id) do
     case Repo.get_by(Usage, api_key_id: api_key_id) do
       nil -> 0
@@ -119,37 +48,117 @@ defmodule AiGuard.Billing do
     end
   end
 
-  # =========================
-  # REVOKE API KEY
-  # =========================
+  # ================= RATE LIMIT =================
+  # 🔥 FIXED: function now exists
 
-  @doc """
-  Revokes an API key by setting revoked_at timestamp.
-  """
-  def revoke_api_key(id) do
-  key = Repo.get!(ApiKey, id)
+  def rate_limited?(api_key_id, limit \\ 5) do
+    one_minute_ago =
+      DateTime.utc_now()
+      |> DateTime.add(-60, :second)
 
-  key
-  |> Ecto.Changeset.change(
-    revoked_at: DateTime.utc_now() |> DateTime.truncate(:second)
-  )
-  |> Repo.update()
-end
-# Rate limit: max requests per minute
-def rate_limited?(api_key_id, limit \\ 5) do
-  one_minute_ago =
-    DateTime.utc_now()
-    |> DateTime.add(-60, :second)
-  count =
-    Repo.aggregate(
-      from(m in "moderations",
-      where: m.api_key == ^get_key_string(api_key_id) and m.inserted_at > ^one_minute_ago
-      ),
-      :count
-    )
+    count =
+      Repo.aggregate(
+        from(m in "moderations",
+          where:
+            m.api_key == ^get_key_string(api_key_id) and
+              m.inserted_at > ^one_minute_ago
+        ),
+        :count
+      )
+
     count >= limit
-end
-defp get_key_string(api_key_id) do
-  Repo.get!(ApiKey, api_key_id).key
-end
+  end
+
+  defp get_key_string(api_key_id) do
+    Repo.get!(ApiKey, api_key_id).key
+  end
+
+  # ================= COST =================
+
+  def cost_for_key(api_key_id) do
+    calls = get_usage_for_key(api_key_id)
+
+    billable =
+      if calls > @free_tier do
+        calls - @free_tier
+      else
+        0
+      end
+
+    Float.round(billable * @price_per_call, 4)
+  end
+
+  def total_cost(api_keys) do
+    api_keys
+    |> Enum.map(&cost_for_key(&1.id))
+    |> Enum.sum()
+    |> Float.round(4)
+  end
+
+  # ================= MONTHLY USAGE =================
+
+  def monthly_usage(api_key_id) do
+    today = Date.utc_today()
+
+    months =
+      for i <- 5..0 do
+        date = Date.add(today, -i * 30)
+        {date.year, date.month}
+      end
+
+    query =
+      from u in Usage,
+        where: u.api_key_id == ^api_key_id,
+        group_by: fragment("date_trunc('month', ?)", u.inserted_at),
+        select: {
+          fragment("date_trunc('month', ?)", u.inserted_at),
+          sum(u.count)
+        }
+
+    results =
+      Repo.all(query)
+      |> Enum.map(fn {date, count} ->
+        {{date.year, date.month}, count}
+      end)
+      |> Map.new()
+
+    Enum.map(months, fn {year, month} ->
+      label = "#{month_name(month)} #{year}"
+      {label, Map.get(results, {year, month}, 0)}
+    end)
+  end
+
+  defp month_name(m) do
+    ~w(Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec)
+    |> Enum.at(m - 1)
+  end
+
+  # ================= INVOICE =================
+
+  def monthly_invoice(api_key_id) do
+    monthly_usage(api_key_id)
+    |> Enum.map(fn {month, calls} ->
+      billable = max(calls - @free_tier, 0)
+      cost = Float.round(billable * @price_per_call, 2)
+
+      %{
+        month: month,
+        calls: calls,
+        billable_calls: billable,
+        cost: cost
+      }
+    end)
+  end
+
+  def billing_csv(api_key_id) do
+    header = "Month,Calls,Billable Calls,Cost"
+
+    rows =
+      monthly_invoice(api_key_id)
+      |> Enum.map(fn row ->
+        "#{row.month},#{row.calls},#{row.billable_calls},#{row.cost}"
+      end)
+
+    Enum.join([header | rows], "\n")
+  end
 end
